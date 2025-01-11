@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 import numpy as np
 from io import BytesIO
+from datetime import datetime
 
 import os
 
@@ -89,17 +90,17 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         'variant_code': varian,
         'rack_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None),
         'shelve_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None),
-        'shelve_code': shelve_code,
+        # 'shelve_code': shelve_code,
         'hole': df['NOTCHES'].map(lambda x: default_lubang[(default_lubang['NOTCHES'] == x) & (default_lubang['JENLOK'] == Jenis_Lokasi)]['HOLE'].values[0] if x in default_lubang['NOTCHES'].values else None),
-        'skew': skew,
-        'single_rack': single_rack,
-        'position': df['POSISI'].map(lambda x: map_posisi[map_posisi['POSISI'] == x]['KODE'].values[0] if x in map_posisi['POSISI'].values else None),
+        # 'skew': skew,
+        # 'single_rack': single_rack,
+        # 'position': df['POSISI'].map(lambda x: map_posisi[map_posisi['POSISI'] == x]['KODE'].values[0] if x in map_posisi['POSISI'].values else None),
         'number': df['No. Urut'],
         'plu': df['PLU'],
         'desc': df['DESC'],
         'tierkk': df['KI-KA'],
         'tierab': df['A-B'],
-        'posting': posting
+        # 'posting': posting
     }
 
     new_df = pd.DataFrame(data)
@@ -145,17 +146,22 @@ if uploaded_file is not None:
             filtered_df = processed_df
             display_filtered_df = display_df
 
-        st.write("Processed DataFrame:")
+        st.write("Cek Report Planogram: ")
         st.dataframe(display_filtered_df.drop(columns=['index']))
+        
+        st.write("Report Planogram Siap Saji:")
+        st.dataframe(filtered_df.drop(columns=['index']))
 
         buffer = BytesIO()
         filtered_df.drop(columns=['index']).to_excel(buffer, index=False, engine='xlsxwriter')
         buffer.seek(0)
+        
+        current_date = datetime.today().date()
 
         st.download_button(
-            label="Download Filtered Processed File",
+            label="Download File Report Planogram",
             data=buffer,
-            file_name="filtered_processed_file.xlsx",
+            file_name=f"report_planogram_{Jenis_Lokasi}_{varian}_{current_date}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     except Exception as e:
