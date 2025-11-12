@@ -46,16 +46,20 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     df = df.sort_values(by=['Shelv', 'No. Urut'])
 
     # Load mapping files
+    # Load mapping files
     data_path = os.path.join(current_dir, 'data')
+
     # Load mapping files based on conditions
-    if section == "AA":
+    if Jenis_Lokasi == "T" and section == "EA":
+        default_lubang_path = os.path.join(data_path, 'SnackStorehub-lubang.xlsx')
+    elif section == "AA":
         default_lubang_path = os.path.join(data_path, 'AA-lubang.xlsx')
     elif varian in ["ACD", "ACE"]:
         default_lubang_path = os.path.join(data_path, 'OpenChiller-lubang.xlsx')
     else:
         default_lubang_path = os.path.join(data_path, 'default-lubang.xlsx')
 
-    default_lubang = pd.read_excel(default_lubang_path)  # File untuk mapping hole
+    default_lubang = pd.read_excel(default_lubang_path) 
     map_posisi = pd.read_excel(os.path.join(data_path,'map-posisi.xlsx'))  # File untuk mapping posisi
 
     # # Ensure required columns exist in the mapping files
