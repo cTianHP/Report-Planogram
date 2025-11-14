@@ -58,7 +58,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         default_lubang_path = os.path.join(data_path, 'FPG-Lubang.xlsx')
     elif section == "AA":
         default_lubang_path = os.path.join(data_path, 'AA-lubang.xlsx')
-    elif section == "AW":
+    elif Jenis_Lokasi == "I" and section == "AW":
         default_lubang_path = os.path.join(data_path, 'WalkInChiller-lubang.xlsx')
     elif Jenis_Lokasi == "F" and section == "AC":
         default_lubang_path = os.path.join(data_path, 'ChillerFlagship-lubang.xlsx')
