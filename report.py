@@ -52,8 +52,16 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     # Load mapping files based on conditions
     if Jenis_Lokasi == "T" and section == "EA":
         default_lubang_path = os.path.join(data_path, 'SnackStorehub-lubang.xlsx')
+    elif Jenis_Lokasi == "I" and section == "T3":
+        default_lubang_path = os.path.join(data_path, 'FPG-Lubang.xlsx')
+    elif Jenis_Lokasi == "I" and ["T1C", "T1D"]:
+        default_lubang_path = os.path.join(data_path, 'FPG-Lubang.xlsx')
     elif section == "AA":
         default_lubang_path = os.path.join(data_path, 'AA-lubang.xlsx')
+    elif section == "AW":
+        default_lubang_path = os.path.join(data_path, 'WalkInChiller-lubang.xlsx')
+    elif Jenis_Lokasi == "F" and section == "AC":
+        default_lubang_path = os.path.join(data_path, 'ChillerFlagship-lubang.xlsx')
     elif varian in ["ACD", "ACE"]:
         default_lubang_path = os.path.join(data_path, 'OpenChiller-lubang.xlsx')
     else:
