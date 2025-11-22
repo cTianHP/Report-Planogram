@@ -75,15 +75,16 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
 
 
     # Create new DataFrame
+    # --- Generate shelve_number & rack_number ---
     shelve_number_series = df['Shelv'].apply(
-    lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None
+        lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None
     )
 
     rack_number_series = df['Shelv'].apply(
         lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None
     )
 
-    # --- Kondisi IF untuk hole ---
+    # --- Logic Hole Based on Section ---
     if section == "AJ":
         hole_series = shelve_number_series
     else:
@@ -92,14 +93,42 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
             if x in default_lubang['NOTCHES'].values else None
         )
 
-    # --- Buat dictionary data ---
+
+    # -------------------------------------------------------------
+    #  LOGIKA BARU UNTUK shelve_code (Lokasi A + Rak Reguler)
+    # -------------------------------------------------------------
+
+    # Default → gunakan input user
+    shelve_code_series = pd.Series([shelve_code] * len(df))
+
+    if Jenis_Lokasi == "A" and tipe_lokasi == "Rak Reguler":
+
+        # Set semua = 2 dulu
+        shelve_code_series = pd.Series([2] * len(df))
+
+        # Temp untuk identifikasi leveling dasar
+        df_temp = df.copy()
+        df_temp["rack_number"] = rack_number_series
+        df_temp["shelve_number"] = shelve_number_series
+
+        # Cari shelve_number terbesar per rack
+        max_shelve_per_rack = df_temp.groupby("rack_number")["shelve_number"].transform("max")
+
+        # Jika shelve_number == maksimum → shelve_code = 1
+        shelve_code_series[df_temp["shelve_number"] == max_shelve_per_rack] = 1
+
+
+    # -------------------------------------------------------------
+    #  FINAL DICTIONARY DATA
+    # -------------------------------------------------------------
+
     data = {
         'location_code': Jenis_Lokasi,
         'section_code': section,
         'variant_code': varian,
         'rack_number': rack_number_series,
         'shelve_number': shelve_number_series,
-        'shelve_code': shelve_code,
+        'shelve_code': shelve_code_series,  # <-- sudah diperbarui
         'hole': hole_series,
         'skew': skew,
         'single_rack': single_rack,
@@ -113,11 +142,16 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         'tierab': df['A-B'],
         'posting': posting
     }
-    
+
+
+    # -------------------------------------------------------------
+    #  DISPLAY DATA (TIDAK BERUBAH)
+    # -------------------------------------------------------------
+
     data_display = {
         'location_code': Jenis_Lokasi,
         'variant_code': varian,
-        'rack_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None),
+        'rack_number': rack_number_series,
         'shelve_number': shelve_number_series,
         'number': df['No. Urut'],
         'plu': df['PLU'],
@@ -125,6 +159,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         'tierkk': df['KI-KA'],
         'tierab': df['A-B'],
     }
+
 
     new_df = pd.DataFrame(data)
     new_df = new_df.reset_index()
