@@ -17,13 +17,6 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     df = pd.read_excel(uploaded_file, skiprows=6)
     df = df.dropna(axis=1, how='all')  # Hapus kolom kosong
     df = df.drop(df.index[-1])
-    # # Pastikan ada cukup baris untuk menghindari kesalahan akses
-    # if len(df) <= 6:
-    #     raise ValueError("File Excel tidak memiliki cukup data untuk diproses.")
-    
-    # df = df.iloc[6:].reset_index(drop=True)  # Mulai dari baris ke-7
-    # df.columns = df.iloc[0].fillna('Unnamed')  # Gunakan baris pertama sebagai header
-    # df = df.drop(df.index[0]).reset_index(drop=True)  # Hapus baris pertama yang sudah digunakan
     
     if 'PLU' not in df.columns:
         raise KeyError("Kolom 'PLU' tidak ditemukan. Pastikan header file Excel benar.")
@@ -46,7 +39,6 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     df = df.sort_values(by=['Shelv', 'No. Urut'])
 
     # Load mapping files
-    # Load mapping files
     data_path = os.path.join(current_dir, 'data')
 
     # Load mapping files based on conditions
@@ -54,7 +46,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         default_lubang_path = os.path.join(data_path, 'SnackStorehub-lubang.xlsx')
     elif Jenis_Lokasi == "I" and section == "T3":
         default_lubang_path = os.path.join(data_path, 'FPG-Lubang.xlsx')
-    elif Jenis_Lokasi == "I" and ["T1C", "T1D"]:
+    elif Jenis_Lokasi == "I" and varian in ["T1C", "T1D"]:
         default_lubang_path = os.path.join(data_path, 'FPG-Lubang.xlsx')
     elif section == "AA":
         default_lubang_path = os.path.join(data_path, 'AA-lubang.xlsx')
@@ -62,7 +54,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         default_lubang_path = os.path.join(data_path, 'WalkInChiller-lubang.xlsx')
     elif Jenis_Lokasi == "F" and section == "AC":
         default_lubang_path = os.path.join(data_path, 'ChillerFlagship-lubang.xlsx')
-    elif varian in ["ACD", "ACE"]:
+    elif Jenis_Lokasi == "I" and varian in ["ACD", "ACE"]:
         default_lubang_path = os.path.join(data_path, 'OpenChiller-lubang.xlsx')
     else:
         default_lubang_path = os.path.join(data_path, 'default-lubang.xlsx')
@@ -70,12 +62,6 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     default_lubang = pd.read_excel(default_lubang_path) 
     map_posisi = pd.read_excel(os.path.join(data_path,'map-posisi.xlsx'))  # File untuk mapping posisi
 
-    # # Ensure required columns exist in the mapping files
-    # if 'JENLOK' not in default_lubang.columns or 'NOTCHES' not in default_lubang.columns or 'HOLE' not in default_lubang.columns:
-    #     raise KeyError("Kolom 'JENLOK', 'NOTCHES', atau 'HOLE' tidak ditemukan dalam file default-lubang.xlsx")
-
-    # if 'POSISI' not in map_posisi.columns or 'KODE' not in map_posisi.columns:
-    #     raise KeyError("Kolom 'POSISI' atau 'KODE' tidak ditemukan dalam file map-posisi.xlsx")
 
     # Create new DataFrame
     data = {
@@ -102,17 +88,12 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         'variant_code': varian,
         'rack_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None),
         'shelve_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None),
-        # 'shelve_code': shelve_code,
         'hole': df['NOTCHES'].map(lambda x: default_lubang[(default_lubang['NOTCHES'] == x)]['HOLE'].values[0] if x in default_lubang['NOTCHES'].values else None),
-        # 'skew': skew,
-        # 'single_rack': single_rack,
-        # 'position': df['POSISI'].map(lambda x: map_posisi[map_posisi['POSISI'] == x]['KODE'].values[0] if x in map_posisi['POSISI'].values else None),
         'number': df['No. Urut'],
         'plu': df['PLU'],
         'desc': df['DESC'],
         'tierkk': df['KI-KA'],
         'tierab': df['A-B'],
-        # 'posting': posting
     }
 
     new_df = pd.DataFrame(data)
@@ -126,13 +107,30 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
 st.title("Report Planogram App") 
 
 # Input fields for variables
-Jenis_Lokasi = st.text_input("Jenis Lokasi", "I")
-section = st.text_input("Section", "AB")
-varian = st.text_input("Varian", "ABA")
+Jenis_Lokasi = st.selectbox("Jenis Lokasi", ["A", "B", "I", "T", "F", "G", "X", "Q"], index=0)
+
+tipe_lokasi = st.selectbox(
+    "Tipe Lokasi",
+    ["Chiller", "Rak Reguler"],
+    index=0
+)
+if tipe_lokasi == "Chiller":
+    single_rack_value = "F"
+else:
+    tipe_rak = st.selectbox("Jenis Rak", ["Rak Double", "Rak Single"], index=0)
+
+    if tipe_rak == "Rak Double":
+        single_rack_value = "F"
+    else:
+        single_rack_value = "T"
+
+section = st.text_input("Section", "AC")
+varian = st.text_input("Varian", "ACH")
 shelve_code = st.number_input("Shelve Code", value=10, step=1)
-skew = st.text_input("Skew", "F")
-single_rack = st.text_input("Single Rack", "F")
-posting = st.text_input("Posting", "T")
+skew = st.selectbox("Skew", ["F","T"], index=0)
+single_rack = st.text_input("Single Rack", value=single_rack_value, disabled=True)
+posting = st.text_input("Posting", value="T", disabled=True)
+
 
 # File Upload
 uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx','xls'])
