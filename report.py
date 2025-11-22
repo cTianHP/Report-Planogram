@@ -88,6 +88,10 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     rack_number_series = df['Shelv'].apply(
         lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None
     )
+    
+    rack_number_series = rack_number_series.astype(int)
+    shelve_number_series = shelve_number_series.astype(int)
+
 
     # ===============================
     # 4. LOGIKA HOLE
@@ -211,8 +215,11 @@ if uploaded_file is not None:
         processed_df, display_df = process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment)
 
         st.write("Filter Results")
-        selected_racks = st.multiselect("Select Rack Numbers", options=sorted(processed_df['rack_number'].dropna().unique()))
-        selected_shelves = st.multiselect("Select Shelve Numbers", options=sorted(processed_df['shelve_number'].dropna().unique()))
+        rack_options = sorted(processed_df['rack_number'].dropna().astype(int).unique())
+        shelve_options = sorted(processed_df['shelve_number'].dropna().astype(int).unique())
+
+        selected_racks = st.multiselect("Select Rack Numbers", options=rack_options)
+        selected_shelves = st.multiselect("Select Shelve Numbers", options=shelve_options)
 
         if selected_racks or selected_shelves:
             filtered_df = processed_df[
