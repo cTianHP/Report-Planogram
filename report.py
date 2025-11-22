@@ -12,7 +12,7 @@ current_dir = os.path.dirname(__file__)
 
 
 # Streamlit App
-def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting):
+def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment):
     # Load Excel file into a DataFrame
     df = pd.read_excel(uploaded_file, skiprows=6)
     df = df.dropna(axis=1, how='all')  # Hapus kolom kosong
@@ -39,7 +39,10 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     df = df.sort_values(by=['Shelv', 'No. Urut'])
 
     # Load mapping files
-    data_path = os.path.join(current_dir, 'data')
+    if settingan_spaceman == "inch":
+        data_path = os.path.join(current_dir, 'data-inch')
+    elif settingan_spaceman == "cm":
+        data_path = os.path.join(current_dir, 'data-cm')
 
     # Load mapping files based on conditions
     if Jenis_Lokasi == "T" and section == "EA":
@@ -56,6 +59,14 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         default_lubang_path = os.path.join(data_path, 'ChillerFlagship-lubang.xlsx')
     elif Jenis_Lokasi == "I" and varian in ["ACD", "ACE"]:
         default_lubang_path = os.path.join(data_path, 'OpenChiller-lubang.xlsx')
+    elif Jenis_Lokasi == "A" and single_rack == "F" and tipe_equipment == "Rak Reguler":
+        default_lubang_path = os.path.join(data_path, 'RakDouble-A.xlsx')
+    elif Jenis_Lokasi == "A" and single_rack == "T" and tipe_equipment == "Rak Reguler":
+        default_lubang_path = os.path.join(data_path, 'RakSingle-A.xlsx')
+    elif Jenis_Lokasi == "B" and single_rack == "F" and tipe_equipment == "Rak Reguler":
+        default_lubang_path = os.path.join(data_path, 'RakDouble-B.xlsx')
+    elif Jenis_Lokasi == "B" and single_rack == "T" and tipe_equipment == "Rak Reguler":
+        default_lubang_path = os.path.join(data_path, 'RakSingle-B.xlsx')
     else:
         default_lubang_path = os.path.join(data_path, 'default-lubang.xlsx')
 
@@ -64,17 +75,38 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
 
 
     # Create new DataFrame
+    shelve_number_series = df['Shelv'].apply(
+    lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None
+    )
+
+    rack_number_series = df['Shelv'].apply(
+        lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None
+    )
+
+    # --- Kondisi IF untuk hole ---
+    if section == "AJ":
+        hole_series = shelve_number_series
+    else:
+        hole_series = df['NOTCHES'].map(
+            lambda x: default_lubang[default_lubang['NOTCHES'] == x]['HOLE'].values[0]
+            if x in default_lubang['NOTCHES'].values else None
+        )
+
+    # --- Buat dictionary data ---
     data = {
         'location_code': Jenis_Lokasi,
         'section_code': section,
         'variant_code': varian,
-        'rack_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None),
-        'shelve_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None),
+        'rack_number': rack_number_series,
+        'shelve_number': shelve_number_series,
         'shelve_code': shelve_code,
-        'hole': df['NOTCHES'].map(lambda x: default_lubang[(default_lubang['NOTCHES'] == x)]['HOLE'].values[0] if x in default_lubang['NOTCHES'].values else None),
+        'hole': hole_series,
         'skew': skew,
         'single_rack': single_rack,
-        'position': df['POSISI'].map(lambda x: map_posisi[map_posisi['POSISI'] == x]['KODE'].values[0] if x in map_posisi['POSISI'].values else None),
+        'position': df['POSISI'].map(
+            lambda x: map_posisi[map_posisi['POSISI'] == x]['KODE'].values[0]
+            if x in map_posisi['POSISI'].values else None
+        ),
         'number': df['No. Urut'],
         'plu': df['PLU'],
         'tierkk': df['KI-KA'],
@@ -84,11 +116,9 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     
     data_display = {
         'location_code': Jenis_Lokasi,
-        'section_code': section,
         'variant_code': varian,
         'rack_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None),
-        'shelve_number': df['Shelv'].apply(lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None),
-        'hole': df['NOTCHES'].map(lambda x: default_lubang[(default_lubang['NOTCHES'] == x)]['HOLE'].values[0] if x in default_lubang['NOTCHES'].values else None),
+        'shelve_number': shelve_number_series,
         'number': df['No. Urut'],
         'plu': df['PLU'],
         'desc': df['DESC'],
@@ -107,14 +137,15 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
 st.title("Report Planogram App") 
 
 # Input fields for variables
+settingan_spaceman = st.selectbox("Settingan Ukuran Spaceman (WAJIB !!!)", ["inch", "cm"], index=0)
 Jenis_Lokasi = st.selectbox("Jenis Lokasi", ["A", "B", "I", "T", "F", "G", "X", "Q"], index=0)
 
-tipe_lokasi = st.selectbox(
-    "Tipe Lokasi",
+tipe_equipment = st.selectbox(
+    "Equipment",
     ["Chiller", "Rak Reguler"],
     index=0
 )
-if tipe_lokasi == "Chiller":
+if tipe_equipment == "Chiller":
     single_rack_value = "F"
 else:
     tipe_rak = st.selectbox("Jenis Rak", ["Rak Double", "Rak Single"], index=0)
@@ -137,7 +168,7 @@ uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx','xls'])
 
 if uploaded_file is not None:
     try:
-        processed_df, display_df = process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting)
+        processed_df, display_df = process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment)
 
         st.write("Filter Results")
         selected_racks = st.multiselect("Select Rack Numbers", options=sorted(processed_df['rack_number'].dropna().unique()))
