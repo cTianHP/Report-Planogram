@@ -13,38 +13,43 @@ current_dir = os.path.dirname(__file__)
 
 # Streamlit App
 def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment):
-    # Load Excel file into a DataFrame
+
+    # ===============================
+    # 1. LOAD & CLEAN AWAL
+    # ===============================
     df = pd.read_excel(uploaded_file, skiprows=6)
-    df = df.dropna(axis=1, how='all')  # Hapus kolom kosong
-    df = df.drop(df.index[-1])
-    
+    df = df.dropna(axis=1, how='all')        # hapus kolom kosong
+    df = df.drop(df.index[-1], errors="ignore")
+
     if 'PLU' not in df.columns:
-        raise KeyError("Kolom 'PLU' tidak ditemukan. Pastikan header file Excel benar.")
+        raise KeyError("Kolom 'PLU' tidak ditemukan.")
 
-    # 2. Hapus baris jika terdapat data kosong pada kolom 'PLU'
-    df['PLU'] = df['PLU'].str.strip()
+    df['PLU'] = df['PLU'].astype(str).str.strip()
     df['PLU'] = df['PLU'].replace("", np.nan)
-    df = df.dropna(subset=['PLU'])
-    
+    df = df.dropna(subset=['PLU'])           # Hapus baris PLU kosong
 
-    # 3. Convert kolom tertentu ke dalam format number
+    # Convert kolom numerik
     columns_to_convert = ['Shelv', 'No. Urut', 'PLU', 'KI-KA', 'A-B']
     for column in columns_to_convert:
         if column in df.columns:
             df[column] = pd.to_numeric(df[column], errors='coerce')
-            if column in ['No. Urut', 'PLU', 'KI-KA', 'A-B']:
-                df[column] = df[column].astype(int)
 
-    # 4. Sorting data frame berdasarkan kolom 'Shelv' terlebih dahulu, kemudian 'No. Urut'
+    df['No. Urut'] = df['No. Urut'].astype(int)
+    df['PLU'] = df['PLU'].astype(int)
+    df['KI-KA'] = df['KI-KA'].astype(int)
+    df['A-B'] = df['A-B'].astype(int)
+
     df = df.sort_values(by=['Shelv', 'No. Urut'])
 
-    # Load mapping files
+    # ===============================
+    # 2. LOAD FILE MAPPING
+    # ===============================
     if settingan_spaceman == "inch":
         data_path = os.path.join(current_dir, 'data-inch')
-    elif settingan_spaceman == "cm":
+    else:
         data_path = os.path.join(current_dir, 'data-cm')
 
-    # Load mapping files based on conditions
+    # Mapping file lubang
     if Jenis_Lokasi == "T" and section == "EA":
         default_lubang_path = os.path.join(data_path, 'SnackStorehub-lubang.xlsx')
     elif Jenis_Lokasi == "I" and section == "T3":
@@ -70,12 +75,12 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     else:
         default_lubang_path = os.path.join(data_path, 'default-lubang.xlsx')
 
-    default_lubang = pd.read_excel(default_lubang_path) 
-    map_posisi = pd.read_excel(os.path.join(data_path,'map-posisi.xlsx'))  # File untuk mapping posisi
+    default_lubang = pd.read_excel(default_lubang_path)
+    map_posisi = pd.read_excel(os.path.join(data_path,'map-posisi.xlsx'))
 
-
-    # Create new DataFrame
-    # --- Generate shelve_number & rack_number ---
+    # ===============================
+    # 3. GENERATE rack_number & shelve_number
+    # ===============================
     shelve_number_series = df['Shelv'].apply(
         lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None
     )
@@ -84,56 +89,53 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None
     )
 
-    # --- Logic Hole Based on Section ---
+    # ===============================
+    # 4. LOGIKA HOLE
+    # ===============================
     if section == "AJ":
         hole_series = shelve_number_series
     else:
         hole_series = df['NOTCHES'].map(
-            lambda x: default_lubang[default_lubang['NOTCHES'] == x]['HOLE'].values[0]
+            lambda x: default_lubang.loc[default_lubang['NOTCHES'] == x, 'HOLE'].values[0]
             if x in default_lubang['NOTCHES'].values else None
         )
 
+    # Clean hole jika data tidak valid
+    mask_invalid = (
+        df['PLU'].isna() |
+        df['Shelv'].isna() |
+        shelve_number_series.isna()
+    )
+    hole_series[mask_invalid] = None
 
-    # -------------------------------------------------------------
-    #  LOGIKA BARU UNTUK shelve_code (Lokasi A + Rak Reguler)
-    # -------------------------------------------------------------
-
-    # Default → gunakan input user
+    # ===============================
+    # 5. LOGIKA shelve_code (Lokasi A + Rak Reguler)
+    # ===============================
     shelve_code_series = pd.Series([shelve_code] * len(df))
 
     if Jenis_Lokasi == "A" and tipe_equipment == "Rak Reguler":
-
-        # Set semua = 2 dulu
         shelve_code_series = pd.Series([2] * len(df))
-
-        # Temp untuk identifikasi leveling dasar
         df_temp = df.copy()
         df_temp["rack_number"] = rack_number_series
         df_temp["shelve_number"] = shelve_number_series
+        max_shelf = df_temp.groupby("rack_number")["shelve_number"].transform("max")
+        shelve_code_series[df_temp["shelve_number"] == max_shelf] = 1
 
-        # Cari shelve_number terbesar per rack
-        max_shelve_per_rack = df_temp.groupby("rack_number")["shelve_number"].transform("max")
-
-        # Jika shelve_number == maksimum → shelve_code = 1
-        shelve_code_series[df_temp["shelve_number"] == max_shelve_per_rack] = 1
-
-
-    # -------------------------------------------------------------
-    #  FINAL DICTIONARY DATA
-    # -------------------------------------------------------------
-
+    # ===============================
+    # 6. BENTUK DATA AKHIR
+    # ===============================
     data = {
         'location_code': Jenis_Lokasi,
         'section_code': section,
         'variant_code': varian,
         'rack_number': rack_number_series,
         'shelve_number': shelve_number_series,
-        'shelve_code': shelve_code_series,  # <-- sudah diperbarui
+        'shelve_code': shelve_code_series,
         'hole': hole_series,
         'skew': skew,
         'single_rack': single_rack,
         'position': df['POSISI'].map(
-            lambda x: map_posisi[map_posisi['POSISI'] == x]['KODE'].values[0]
+            lambda x: map_posisi.loc[map_posisi['POSISI'] == x, 'KODE'].values[0]
             if x in map_posisi['POSISI'].values else None
         ),
         'number': df['No. Urut'],
@@ -142,11 +144,6 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         'tierab': df['A-B'],
         'posting': posting
     }
-
-
-    # -------------------------------------------------------------
-    #  DISPLAY DATA (TIDAK BERUBAH)
-    # -------------------------------------------------------------
 
     data_display = {
         'location_code': Jenis_Lokasi,
@@ -157,17 +154,25 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         'plu': df['PLU'],
         'desc': df['DESC'],
         'tierkk': df['KI-KA'],
-        'tierab': df['A-B'],
+        'tierab': df['A-B']
     }
 
+    new_df = pd.DataFrame(data).dropna()
+    display_df = pd.DataFrame(data_display).dropna()
 
-    new_df = pd.DataFrame(data)
-    new_df = new_df.reset_index()
-    
-    display_df = pd.DataFrame(data_display)
-    display_df = display_df.reset_index()
+    # ===============================
+    # 7. SORT FINAL
+    # ===============================
+    new_df = new_df.sort_values(
+        by=['rack_number', 'shelve_number', 'number']
+    ).reset_index(drop=True)
+
+    display_df = display_df.sort_values(
+        by=['rack_number', 'shelve_number', 'number']
+    ).reset_index(drop=True)
 
     return new_df, display_df
+
 
 st.title("Report Planogram App") 
 
