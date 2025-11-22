@@ -101,7 +101,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     # Default → gunakan input user
     shelve_code_series = pd.Series([shelve_code] * len(df))
 
-    if Jenis_Lokasi == "A" and tipe_lokasi == "Rak Reguler":
+    if Jenis_Lokasi == "A" and tipe_equipment == "Rak Reguler":
 
         # Set semua = 2 dulu
         shelve_code_series = pd.Series([2] * len(df))
