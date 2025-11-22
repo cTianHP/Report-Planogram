@@ -228,13 +228,13 @@ if uploaded_file is not None:
             display_filtered_df = display_df
 
         st.write("Cek Report Planogram: ")
-        st.dataframe(display_filtered_df.drop(columns=['index']))
+        st.dataframe(display_filtered_df)
         
         st.write("Report Planogram Siap Saji:")
-        st.dataframe(filtered_df.drop(columns=['index']))
+        st.dataframe(filtered_df)
 
         buffer = BytesIO()
-        filtered_df.drop(columns=['index']).to_excel(buffer, index=False, engine='xlsxwriter')
+        filtered_df.to_excel(buffer, index=False, engine='xlsxwriter')
         buffer.seek(0)
         
         current_date = datetime.today().date()
