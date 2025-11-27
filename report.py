@@ -175,7 +175,14 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         by=['rack_number', 'shelve_number', 'number']
     ).reset_index(drop=True)
 
+    cols_int = ['rack_number', 'shelve_number', 'number']
+
+    for c in cols_int:
+        new_df[c] = pd.to_numeric(new_df[c], errors='coerce').astype('Int64')
+        display_df[c] = pd.to_numeric(display_df[c], errors='coerce').astype('Int64')
+    
     return new_df, display_df
+
 
 
 st.title("Report Planogram App") 
