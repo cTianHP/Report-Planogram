@@ -127,7 +127,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     # ===============================
 
     # DEFAULT: semua ikut parameter shelve_code
-    shelve_code_series = pd.Series([shelve_code] * len(df))
+    # shelve_code_series = pd.Series([shelve_code] * len(df))
 
     # if Jenis_Lokasi == "A" and tipe_equipment == "Rak Reguler":
 
@@ -163,7 +163,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         'variant_code': varian,
         'rack_number': rack_number_series,
         'shelve_number': shelve_number_series,
-        'shelve_code': shelve_code_series,
+        'shelve_code': shelve_code,
         'hole': hole_series,
         'skew': skew,
         'single_rack': single_rack,
