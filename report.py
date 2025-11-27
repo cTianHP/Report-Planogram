@@ -105,7 +105,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
 
     # ===============================
     # 4. LOGIKA HOLE
-    # ===============================
+    # # ===============================
     if section == "AJ":
         hole_series = shelve_number_series
     else:
@@ -114,13 +114,13 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
             if x in default_lubang['NOTCHES'].values else None
         )
 
-    # Clean hole jika data tidak valid
-    mask_invalid = (
-        df['PLU'].isna() |
-        df['Shelv'].isna() |
-        shelve_number_series.isna()
-    )
-    hole_series[mask_invalid] = None
+    # # Clean hole jika data tidak valid
+    # mask_invalid = (
+    #     df['PLU'].isna() |
+    #     df['Shelv'].isna() |
+    #     shelve_number_series.isna()
+    # )
+    # hole_series[mask_invalid] = None
 
     # ===============================
     # 5. LOGIKA shelve_code (Lokasi A + Rak Reguler)
@@ -129,30 +129,30 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     # DEFAULT: semua ikut parameter shelve_code
     shelve_code_series = pd.Series([shelve_code] * len(df))
 
-    if Jenis_Lokasi == "A" and tipe_equipment == "Rak Reguler":
+    # if Jenis_Lokasi == "A" and tipe_equipment == "Rak Reguler":
 
-        # Step 1: default semua = 2
-        shelve_code_series = pd.Series([2] * len(df))
+    #     # Step 1: default semua = 2
+    #     shelve_code_series = pd.Series([2] * len(df))
 
-        # Step 2: siapkan dataframe temp
-        df_temp = df.copy()
-        df_temp["rack_number"] = rack_number_series
-        df_temp["shelve_number"] = shelve_number_series
+    #     # Step 2: siapkan dataframe temp
+    #     df_temp = df.copy()
+    #     df_temp["rack_number"] = rack_number_series
+    #     df_temp["shelve_number"] = shelve_number_series
 
-        # Step 3: drop shelve yang tidak valid sebelum hitung max
-        df_valid = df_temp.dropna(subset=["shelve_number"])
+    #     # Step 3: drop shelve yang tidak valid sebelum hitung max
+    #     df_valid = df_temp.dropna(subset=["shelve_number"])
 
-        # Step 4: hitung shelf paling dasar (max per rack)
-        max_shelf = df_valid.groupby("rack_number")["shelve_number"].transform("max")
+    #     # Step 4: hitung shelf paling dasar (max per rack)
+    #     max_shelf = df_valid.groupby("rack_number")["shelve_number"].transform("max")
 
-        # Step 5: gabungkan max shelf ke df_temp by index
-        df_temp.loc[df_valid.index, "max_shelf"] = max_shelf
+    #     # Step 5: gabungkan max shelf ke df_temp by index
+    #     df_temp.loc[df_valid.index, "max_shelf"] = max_shelf
 
-        # Step 6: assign shelve_code = 1 untuk shelf paling dasar
-        shelve_code_series[df_temp["shelve_number"] == df_temp["max_shelf"]] = 1
+    #     # Step 6: assign shelve_code = 1 untuk shelf paling dasar
+    #     shelve_code_series[df_temp["shelve_number"] == df_temp["max_shelf"]] = 1
 
-    else:
-        shelve_code_series = pd.Series([shelve_code] * len(df))
+    # else:
+    #     shelve_code_series = pd.Series([shelve_code] * len(df))
 
     # ===============================
     # 6. BENTUK DATA AKHIR
