@@ -181,7 +181,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         new_df[c] = pd.to_numeric(new_df[c], errors='coerce').astype('Int64')
         display_df[c] = pd.to_numeric(display_df[c], errors='coerce').astype('Int64')
     
-    return new_df, display_df
+    return new_df, display_df, data
 
 
 
@@ -219,8 +219,11 @@ uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx','xls'])
 
 if uploaded_file is not None:
     try:
-        processed_df, display_df = process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment)
+        processed_df, display_df, data = process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment)
 
+        st.write("Cek Report Planogram: ")
+        st.dataframe(data)
+        
         st.write("Filter Results")
         rack_options = sorted(processed_df['rack_number'].dropna().astype(int).unique())
         shelve_options = sorted(processed_df['shelve_number'].dropna().astype(int).unique())
