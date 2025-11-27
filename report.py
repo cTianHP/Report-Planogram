@@ -81,13 +81,23 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     # ===============================
     # 3. GENERATE rack_number & shelve_number
     # ===============================
-    shelve_number_series = df['Shelv'].apply(
-        lambda x: int(str(x).split('.')[1]) if pd.notnull(x) and '.' in str(x) else None
-    )
+    def extract_rack(x):
+        if pd.isna(x):
+            return None
+        parts = str(x).split('.')
+        return int(parts[0]) if parts[0].isdigit() else None
 
-    rack_number_series = df['Shelv'].apply(
-        lambda x: int(str(x).split('.')[0]) if pd.notnull(x) else None
-    )
+    def extract_shelf(x):
+        if pd.isna(x):
+            return None
+        parts = str(x).split('.')
+        # jika tidak ada bagian belakang → None
+        if len(parts) < 2 or not parts[1].isdigit():
+            return None
+        return int(parts[1])
+
+    rack_number_series = df['Shelv'].apply(extract_rack)
+    shelve_number_series = df['Shelv'].apply(extract_shelf)
     
     rack_number_series = rack_number_series.astype(int)
     shelve_number_series = shelve_number_series.astype(int)
