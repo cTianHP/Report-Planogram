@@ -111,7 +111,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     else:
         hole_series = df['NOTCHES'].map(
             lambda x: default_lubang.loc[default_lubang['NOTCHES'] == x, 'HOLE'].values[0]
-            if x in default_lubang['NOTCHES'].values else None
+            if x in default_lubang['NOTCHES'].values else "ERROR"
         )
 
     # # Clean hole jika data tidak valid
@@ -249,6 +249,31 @@ uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx','xls'])
 if uploaded_file is not None:
     try:
         processed_df, display_df = process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment)
+        
+        # ===============================
+        # CEK HOLE ERROR + DETAIL LOKASI
+        # ===============================
+        if 'hole' in processed_df.columns:
+            error_rows = processed_df[processed_df['hole'] == "ERROR"]
+
+            if not error_rows.empty:
+                lokasi_error = (
+                    error_rows[['rack_number', 'shelve_number']]
+                    .dropna()
+                    .drop_duplicates()
+                    .sort_values(['rack_number', 'shelve_number'])
+                )
+
+                lokasi_text = ", ".join(
+                    f"Rak {int(r)} – Shelving {int(s)}"
+                    for r, s in lokasi_error.values
+                )
+
+                st.warning(
+                    f"⚠️ HOLE ERROR ditemukan pada lokasi berikut:\n"
+                    f"{lokasi_text}\n\n"
+                    "Silakan periksa NOTCHES atau file mapping lubang yang digunakan."
+                )
         
         st.write("Filter Results")
         rack_options = sorted(processed_df['rack_number'].dropna().astype(int).unique())
