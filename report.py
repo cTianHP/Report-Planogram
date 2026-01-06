@@ -313,5 +313,161 @@ if uploaded_file is not None:
             file_name=f"report_planogram_{Jenis_Lokasi}_{varian}_{current_date}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+        
+        
+        # ======================================================
+        # SECTION BARU - SIMULASI TAMBAH ITEM PLANOGRAM
+        # ======================================================
+        st.markdown("---")
+        st.subheader("🧪 Tambah Item Planogram")
+
+        # ===============================
+        # INIT SIMULASI DF
+        # ===============================
+        if "simulasi_df" not in st.session_state:
+            st.session_state.simulasi_df = filtered_df.copy()
+
+        sim_df = st.session_state.simulasi_df
+
+        # ===============================
+        # FILTER SIMULASI
+        # ===============================
+        st.write("Filter Simulasi")
+
+        sim_rack_opts = sorted(sim_df['rack_number'].dropna().astype(int).unique())
+        sim_shelf_opts = sorted(sim_df['shelve_number'].dropna().astype(int).unique())
+
+        sim_racks = st.multiselect("Rack (Simulasi)", sim_rack_opts)
+        sim_shelves = st.multiselect("Shelving (Simulasi)", sim_shelf_opts)
+
+        if sim_racks or sim_shelves:
+            sim_filtered = sim_df[
+                (sim_df['rack_number'].isin(sim_racks) if sim_racks else True) &
+                (sim_df['shelve_number'].isin(sim_shelves) if sim_shelves else True)
+            ]
+        else:
+            sim_filtered = sim_df
+
+        # ===============================
+        # FORM TAMBAH ITEM
+        # ===============================
+        with st.form("form_simulasi", clear_on_submit=True):
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+                in_rack = st.selectbox("Rack", sim_rack_opts)
+
+            with c2:
+                shelf_opts = sorted(
+                    sim_df[sim_df['rack_number'] == in_rack]['shelve_number']
+                    .dropna().astype(int).unique()
+                )
+                in_shelf = st.selectbox("Shelving", shelf_opts)
+
+            with c3:
+                exist_numbers = sim_df[
+                    (sim_df['rack_number'] == in_rack) &
+                    (sim_df['shelve_number'] == in_shelf)
+                ]['number'].dropna().astype(int)
+
+                max_no = exist_numbers.max() if not exist_numbers.empty else 0
+                in_number = st.selectbox("Nomor Urut", list(range(1, max_no + 2)))
+
+            in_plu = st.number_input(
+                "PLU",
+                min_value=1,
+                step=1,
+                value=1
+            )
+            in_pos = st.selectbox("Position", ["A", "B", "U", "D", "X", "Y"])
+
+            in_kk = st.number_input(
+                "Tier KI-KA",
+                min_value=1,
+                step=1,
+                value=1
+            )
+
+            in_ab = st.number_input(
+                "Tier A-B",
+                min_value=1,
+                step=1,
+                value=1
+            )
+
+            submit_sim = st.form_submit_button("➕ Tambahkan")
+
+        # ===============================
+        # SUBMIT LOGIC (AUTO REFRESH)
+        # ===============================
+        if submit_sim:
+            df_new = sim_df.copy()
+
+            # Ambil hole berdasarkan rak & shelving
+            hole_val = (
+                df_new[
+                    (df_new['rack_number'] == in_rack) &
+                    (df_new['shelve_number'] == in_shelf)
+                ]['hole']
+                .dropna()
+                .mode()
+            )
+            hole_val = hole_val.iloc[0] if not hole_val.empty else None
+
+            # Geser nomor urut
+            shift_mask = (
+                (df_new['rack_number'] == in_rack) &
+                (df_new['shelve_number'] == in_shelf) &
+                (df_new['number'] >= in_number)
+            )
+            df_new.loc[shift_mask, 'number'] += 1
+
+            # Logic D → atas jadi U
+            if in_pos == "D":
+                above_mask = (
+                    (df_new['rack_number'] == in_rack) &
+                    (df_new['shelve_number'] == in_shelf) &
+                    (df_new['number'] == in_number - 1)
+                )
+                df_new.loc[above_mask, 'position'] = "U"
+
+            # Baris baru
+            new_row = {
+                'location_code': Jenis_Lokasi,
+                'section_code': section,
+                'variant_code': varian,
+                'rack_number': in_rack,
+                'shelve_number': in_shelf,
+                'shelve_code': shelve_code,
+                'hole': hole_val,
+                'skew': skew,
+                'single_rack': single_rack,
+                'position': in_pos,
+                'number': in_number,
+                'plu': in_plu if in_plu else None,
+                'tierkk': in_kk if in_kk else None,
+                'tierab': in_ab if in_ab else None,
+                'posting': posting
+            }
+
+            st.session_state.simulasi_df = pd.concat(
+                [df_new, pd.DataFrame([new_row])],
+                ignore_index=True
+            )
+
+            st.success("✅ Item berhasil ditambahkan")
+
+            # 🔥 INI KUNCI AUTO REFRESH
+            st.rerun()
+
+        # ===============================
+        # TAMPILKAN HASIL SIMULASI
+        # ===============================
+        st.write("Hasil Simulasi Planogram:")
+        st.dataframe(
+            sim_filtered.sort_values(['rack_number', 'shelve_number', 'number'])
+        )
+
+
     except Exception as e:
         st.error(f"An error occurred: {e}")
