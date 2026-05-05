@@ -12,7 +12,7 @@ current_dir = os.path.dirname(__file__)
 
 
 # Streamlit App
-def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment):
+def process_excel(uploaded_file, kode_cabang, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, settingan_spaceman, tipe_equipment, jumlah_rak_roti=None):
 
     # ===============================
     # 1. LOAD & CLEAN AWAL
@@ -56,8 +56,8 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         default_lubang_path = os.path.join(data_path, 'FPG-Lubang.xlsx')
     elif Jenis_Lokasi == "I" and varian in ["T1C", "T1D"]:
         default_lubang_path = os.path.join(data_path, 'FPG-Lubang.xlsx')
-    elif section == "AA":
-        default_lubang_path = os.path.join(data_path, 'AA-lubang.xlsx')
+    # elif section == "AA":
+    #     default_lubang_path = os.path.join(data_path, 'AA-lubang.xlsx')
     elif Jenis_Lokasi == "I" and section == "AW":
         default_lubang_path = os.path.join(data_path, 'WalkInChiller-lubang.xlsx')
     elif Jenis_Lokasi == "F" and section == "AC":
@@ -72,10 +72,35 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         default_lubang_path = os.path.join(data_path, 'RakDouble-B.xlsx')
     elif Jenis_Lokasi == "B" and single_rack == "T" and tipe_equipment == "Rak Reguler":
         default_lubang_path = os.path.join(data_path, 'RakSingle-B.xlsx')
+    elif tipe_equipment == "Standing Freezer":
+        default_lubang_path = os.path.join(data_path, 'lubang-STD Freezer.xlsx')
+    elif tipe_equipment == "Rak Roti":
+        if jumlah_rak_roti is None:
+            raise ValueError("jumlah_rak_roti harus diisi untuk Rak Roti")
+        if Jenis_Lokasi == "A":
+            default_lubang_path = os.path.join(
+                data_path,
+                f'lubang-Rak Roti-A-{jumlah_rak_roti}.xlsx'
+            )
+        elif Jenis_Lokasi == "B":
+            default_lubang_path = os.path.join(
+                data_path,
+                f'lubang-Rak Roti-B-{jumlah_rak_roti}.xlsx'
+            )
+        else:
+            raise ValueError(f"Rak Roti tidak tersedia untuk lokasi {Jenis_Lokasi}")
     else:
         default_lubang_path = os.path.join(data_path, 'default-lubang.xlsx')
 
     default_lubang = pd.read_excel(default_lubang_path)
+    # ===============================
+    # TAMBAH KODE DI FILE LUBANG
+    # ===============================
+    if tipe_equipment in ["Standing Freezer", "Rak Roti"]:
+        default_lubang['Kode'] = (
+            default_lubang['Rak'].astype(str) + "-" +
+            default_lubang['Shelving'].astype(str)
+        )
     map_posisi = pd.read_excel(os.path.join(data_path,'map-posisi.xlsx'))
 
     # ===============================
@@ -101,63 +126,40 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
     
     rack_number_series = rack_number_series.astype(int)
     shelve_number_series = shelve_number_series.astype(int)
+    
+    kode_series = (
+        rack_number_series.astype(str) + "-" +
+        shelve_number_series.astype(str)
+    )
 
 
     # ===============================
     # 4. LOGIKA HOLE
     # # ===============================
-    if section == "AJ":
-        hole_series = shelve_number_series
-    else:
-        hole_series = df['NOTCHES'].map(
-            lambda x: default_lubang.loc[default_lubang['NOTCHES'] == x, 'HOLE'].values[0]
-            if x in default_lubang['NOTCHES'].values else "ERROR"
+    if tipe_equipment in ["Standing Freezer", "Rak Roti"]:
+        hole_series = kode_series.map(
+            lambda x: default_lubang.loc[
+                default_lubang['Kode'] == x, 'Lubang'
+            ].values[0]
+            if x in default_lubang['Kode'].values else "ERROR"
         )
 
-    # # Clean hole jika data tidak valid
-    # mask_invalid = (
-    #     df['PLU'].isna() |
-    #     df['Shelv'].isna() |
-    #     shelve_number_series.isna()
-    # )
-    # hole_series[mask_invalid] = None
+    elif section == "AJ":
+        hole_series = shelve_number_series
 
-    # ===============================
-    # 5. LOGIKA shelve_code (Lokasi A + Rak Reguler)
-    # ===============================
-
-    # DEFAULT: semua ikut parameter shelve_code
-    # shelve_code_series = pd.Series([shelve_code] * len(df))
-
-    # if Jenis_Lokasi == "A" and tipe_equipment == "Rak Reguler":
-
-    #     # Step 1: default semua = 2
-    #     shelve_code_series = pd.Series([2] * len(df))
-
-    #     # Step 2: siapkan dataframe temp
-    #     df_temp = df.copy()
-    #     df_temp["rack_number"] = rack_number_series
-    #     df_temp["shelve_number"] = shelve_number_series
-
-    #     # Step 3: drop shelve yang tidak valid sebelum hitung max
-    #     df_valid = df_temp.dropna(subset=["shelve_number"])
-
-    #     # Step 4: hitung shelf paling dasar (max per rack)
-    #     max_shelf = df_valid.groupby("rack_number")["shelve_number"].transform("max")
-
-    #     # Step 5: gabungkan max shelf ke df_temp by index
-    #     df_temp.loc[df_valid.index, "max_shelf"] = max_shelf
-
-    #     # Step 6: assign shelve_code = 1 untuk shelf paling dasar
-    #     shelve_code_series[df_temp["shelve_number"] == df_temp["max_shelf"]] = 1
-
-    # else:
-    #     shelve_code_series = pd.Series([shelve_code] * len(df))
+    else:
+        hole_series = df['NOTCHES'].map(
+            lambda x: default_lubang.loc[
+                default_lubang['NOTCHES'] == x, 'HOLE'
+            ].values[0]
+            if x in default_lubang['NOTCHES'].values else "ERROR"
+        )
 
     # ===============================
     # 6. BENTUK DATA AKHIR
     # ===============================
     data = {
+        'kode_cabang': kode_cabang,
         'location_code': Jenis_Lokasi,
         'section_code': section,
         'variant_code': varian,
@@ -174,8 +176,7 @@ def process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, ske
         'number': df['No. Urut'],
         'plu': df['PLU'],
         'tierkk': df['KI-KA'],
-        'tierab': df['A-B'],
-        'posting': posting
+        'tierab': df['A-B']
     }
 
     data_display = {
@@ -218,16 +219,18 @@ st.title("Report Planogram App")
 
 # Input fields for variables
 settingan_spaceman = st.selectbox("Settingan Ukuran Spaceman (WAJIB !!!)", ["inch", "cm"], index=0)
+kode_cabang = st.text_input("Kode Cabang", value="KZ01")
 Jenis_Lokasi = st.selectbox("Jenis Lokasi", ["A", "B", "I", "T", "F", "G", "X", "Q"], index=0)
 
 tipe_equipment = st.selectbox(
     "Equipment",
-    ["Chiller", "Rak Reguler"],
+    ["Chiller","Standing Freezer","Freezer Nugget","Freezer Ice Cream", "Rak Roti", "Rak Reguler"],
     index=0
 )
-if tipe_equipment == "Chiller":
-    single_rack_value = "F"
-else:
+single_rack_value = "F"
+jumlah_rak_roti = None
+
+if tipe_equipment == "Rak Reguler":
     tipe_rak = st.selectbox("Jenis Rak", ["Rak Double", "Rak Single"], index=0)
 
     if tipe_rak == "Rak Double":
@@ -235,12 +238,15 @@ else:
     else:
         single_rack_value = "T"
 
+elif tipe_equipment == "Rak Roti":
+    jumlah_rak_roti = st.selectbox("Jumlah Rak Roti",[1,2,3], index=0)
+    single_rack_value = "F"  
+
 section = st.text_input("Section", "AC")
 varian = st.text_input("Varian", "ACH")
 shelve_code = st.number_input("Shelve Code", value=10, step=1)
 skew = st.selectbox("Skew", ["F","T"], index=0)
 single_rack = st.text_input("Single Rack", value=single_rack_value, disabled=True)
-posting = st.text_input("Posting", value="T", disabled=True)
 
 
 # File Upload
@@ -248,7 +254,9 @@ uploaded_file = st.file_uploader("Upload your Excel file", type=['xlsx','xls'])
 
 if uploaded_file is not None:
     try:
-        processed_df, display_df = process_excel(uploaded_file, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, posting, settingan_spaceman, tipe_equipment)
+        processed_df, display_df = process_excel(
+            uploaded_file, kode_cabang, Jenis_Lokasi, section, varian, shelve_code, skew, single_rack, settingan_spaceman, tipe_equipment, jumlah_rak_roti if tipe_equipment == "Rak Roti" else None
+        )
         
         # ===============================
         # CEK HOLE ERROR + DETAIL LOKASI
@@ -324,7 +332,14 @@ if uploaded_file is not None:
         # INIT SIMULASI DF (ambil dari filtered_df saat ini)
         # ===============================
         if "simulasi_df" not in st.session_state:
-            st.session_state.simulasi_df = filtered_df.copy()
+            sim_init = filtered_df.copy()
+            sim_init['kode_cabang'] = kode_cabang
+
+            # pastikan di depan
+            cols = ['kode_cabang'] + [c for c in sim_init.columns if c != 'kode_cabang']
+            sim_init = sim_init[cols]
+
+            st.session_state.simulasi_df = sim_init
         sim_df = st.session_state.simulasi_df
 
         # ===============================
@@ -437,6 +452,7 @@ if uploaded_file is not None:
 
                 # build new row (allow None for optionals)
                 new_row = {
+                    'kode_cabang': kode_cabang,
                     'location_code': Jenis_Lokasi,
                     'section_code': section,
                     'variant_code': varian,
@@ -450,8 +466,7 @@ if uploaded_file is not None:
                     'number': int(in_number),
                     'plu': int(in_plu),
                     'tierkk': int(in_kk),
-                    'tierab': int(in_ab),
-                    'posting': posting
+                    'tierab': int(in_ab)
                 }
 
                 # append and re-sort
