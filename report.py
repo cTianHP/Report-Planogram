@@ -284,24 +284,44 @@ if uploaded_file is not None:
                 )
         
         st.write("Filter Results")
-        rack_options = sorted(processed_df['rack_number'].dropna().astype(int).unique())
-        shelve_options = sorted(processed_df['shelve_number'].dropna().astype(int).unique())
 
-        selected_racks = st.multiselect("Select Rack Numbers", options=rack_options)
-        selected_shelves = st.multiselect("Select Shelve Numbers", options=shelve_options)
+        # 1. Pastikan opsi dikonversi ke standard Python list (.tolist())
+        rack_options = sorted(processed_df['rack_number'].dropna().astype(int).unique().tolist())
 
-        if selected_racks or selected_shelves:
-            filtered_df = processed_df[
-                (processed_df['rack_number'].isin(selected_racks) if selected_racks else True) &
-                (processed_df['shelve_number'].isin(selected_shelves) if selected_shelves else True)
-            ]
-            display_filtered_df = display_df[
-                (display_df['rack_number'].isin(selected_racks) if selected_racks else True) &
-                (display_df['shelve_number'].isin(selected_shelves) if selected_shelves else True)
-            ]
+        selected_racks = st.multiselect(
+            "Select Rack Numbers",
+            options=rack_options
+        )
+
+        # 2. FILTER BERTINGKAT: Opsi Shelve menyesuaikan Rack yang dipilih
+        if selected_racks:
+            # Jika ada rak yang dipilih, ambil opsi shelve hanya dari rak tersebut
+            temp_df_for_shelve = processed_df[processed_df['rack_number'].isin(list(selected_racks))]
         else:
-            filtered_df = processed_df
-            display_filtered_df = display_df
+            # Jika tidak ada rak yang dipilih, tampilkan semua opsi shelve
+            temp_df_for_shelve = processed_df
+
+        shelve_options = sorted(temp_df_for_shelve['shelve_number'].dropna().astype(int).unique().tolist())
+
+        selected_shelves = st.multiselect(
+            "Select Shelve Numbers",
+            options=shelve_options
+        )
+
+        # ===============================
+        # FILTER DATA UTAMA
+        # ===============================
+        filtered_df = processed_df.copy()
+        display_filtered_df = display_df.copy()
+
+        # Gunakan list() di dalam isin() untuk mencegah error mismatch tipe data Pandas
+        if selected_racks:
+            filtered_df = filtered_df[filtered_df['rack_number'].isin(list(selected_racks))]
+            display_filtered_df = display_filtered_df[display_filtered_df['rack_number'].isin(list(selected_racks))]
+
+        if selected_shelves:
+            filtered_df = filtered_df[filtered_df['shelve_number'].isin(list(selected_shelves))]
+            display_filtered_df = display_filtered_df[display_filtered_df['shelve_number'].isin(list(selected_shelves))]
 
         st.write("Cek Report Planogram: ")
         st.dataframe(display_filtered_df)
@@ -485,17 +505,29 @@ if uploaded_file is not None:
         # TAMPILAN HASIL SIMULASI (SETELAH SUBMIT AKAN TERUPDATE)
         # ===============================
         st.write("Hasil Simulasi Planogram:")
-        # recompute sim_df & sim_filtered from session state (fresh)
-        sim_df = st.session_state.simulasi_df
-        if sim_racks or sim_shelves:
-            sim_filtered = sim_df[
-                (sim_df['rack_number'].isin(sim_racks) if sim_racks else True) &
-                (sim_df['shelve_number'].isin(sim_shelves) if sim_shelves else True)
-            ]
-        else:
-            sim_filtered = sim_df
+        
+        # 1. Ambil data fresh dari session state
+        sim_df = st.session_state.simulasi_df.copy()
+        
+        # 2. Filter bertahap: Lebih aman, mudah dibaca, dan bebas dari error bitwise
+        if sim_racks:
+            sim_df = sim_df[sim_df['rack_number'].isin(list(sim_racks))]
+            
+        if sim_shelves:
+            sim_df = sim_df[sim_df['shelve_number'].isin(list(sim_shelves))]
+            
+        # Simpan hasil akhir ke sim_filtered
+        sim_filtered = sim_df
 
-        st.dataframe(sim_filtered.sort_values(['rack_number', 'shelve_number', 'number']))
+        # 3. Urutkan dan tampilkan data
+        # Ditambahkan penanganan error jika seandainya nama kolom 'number' berbeda
+        try:
+            sim_filtered_sorted = sim_filtered.sort_values(['rack_number', 'shelve_number', 'number'])
+            st.dataframe(sim_filtered_sorted)
+        except KeyError:
+            # Fallback jika kolom 'number' tidak ditemukan
+            sim_filtered_sorted = sim_filtered.sort_values(['rack_number', 'shelve_number'])
+            st.dataframe(sim_filtered_sorted)
 
 
 
